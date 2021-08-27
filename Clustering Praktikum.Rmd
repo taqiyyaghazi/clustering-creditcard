@@ -1,0 +1,173 @@
+---
+title: "Clustering Credit Card Dataset"
+output: html_notebook
+---
+
+# Deskripsi data
+
+1. CUSTID: Identitas Pemegang Kartu Kredit (Kategori)
+2. BALANCE: Jumlah saldo yang tersisa di akun mereka untuk melakukan pembelian
+3. BALANCEFREQUENCY: Seberapa sering Saldo diperbarui, skor antara 0 dan 1 (1 = sering
+diperbarui, 0 = tidak sering diperbarui)
+4. PURCHASES: Jumlah pembelian yang dilakukan dari akun
+5. ONEOFFPURCHASES: Jumlah pembelian maksimum dilakukan dalam sekali jalan
+6. INSTALLMENTSPURCHASES: Jumlah pembelian yang dilakukan secara mencicil
+7. CASHADVANCE: Uang tunai di muka yang diberikan oleh pengguna
+8. PURCHASESFREQUENCY: Seberapa sering Pembelian dilakukan. Skor antara 0 dan 1 (1 = sering
+dibeli, 0 = tidak sering dibeli)
+9. ONEOFFPURCHASESFREQUENCY: Seberapa sering Pembelian terjadi dalam sekali jalan (1 =
+sering dibeli, 0 = tidak sering dibeli)
+10. PURCHASESINSTALLMENTSFREQUENCY: Seberapa sering pembelian secara mencicil dilakukan
+(1 = sering dilakukan, 0 = tidak sering dilakukan)
+11. CASHADVANCEFREQUENCY: Seberapa sering uang tunai di muka dibayarkan
+12. CASHADVANCETRX: Jumlah Transaksi yang dilakukan dengan “Cash in Advanced”
+13. PURCHASESTRX : Banyaknya transaksi pembelian yang pernah dilakukan
+14. CREDITLIMIT: Batas Kartu Kredit untuk pengguna
+15. PAYMENTS: Jumlah Pembayaran yang dilakukan oleh pengguna
+16. MINIMUM_PAYMENTS: Jumlah pembayaran minimum yang dilakukan oleh pengguna
+17. PRCFULLPAYMENT: Persentase pembayaran penuh yang dibayarkan oleh pengguna
+18. TENURE: Jangka waktu layanan kartu kredit untuk pengguna
+
+Pengolahan Data menggunakan Open Source R
+
+## Langkah 1 : Membaca data
+
+```{r}
+data <- read.csv("D:/Akademik/KMMI Bisnis Analitik/CC_GENERAL.csv",sep = ",")
+```
+## Langkah 2 : Melakukan statistika deskriptif dan preprocessing
+
+```{r}
+summary(data)
+```
+
+Dari data tersebut ditemukan missing value pada kolom CREDIT_LIMIT dan MINIMUM_PAYMENTS
+
+Melihat grafik distribusi kolom CREDI_LIMIT dan MINIMUM_PAYMENTS untuk menentukan metode impute missing value
+```{r}
+library(ggplot2)
+ggplot(data,aes(x=CREDIT_LIMIT))+
+ geom_histogram(aes(y=..density..),colour="black", fill="white")+
+ geom_density(alpha=0.1,fill="red")
+```
+
+```{r}
+ggplot(data,aes(x=MINIMUM_PAYMENTS))+
+ geom_histogram(aes(y=..density..),colour="black", fill="white")+
+ geom_density(alpha=0.1,fill="red")
+```
+
+Berdasarkan kedua gambar tersebut dapat diketahui bahwa variabel CREDIT_LIMIT dan
+MINIMUM_PAYMENTS tidak berdistribusi normal. Sehingga missing value dapat diatasi dengan
+melakukan imputasi menggunakan nilai median pada tiap variabel.
+
+
+## Impute Missing Value
+```{r}
+data$CREDIT_LIMIT[is.na(data$CREDIT_LIMIT)] <- median(data$CREDIT_LIMIT, na.rm =
+TRUE)
+data$MINIMUM_PAYMENTS[is.na(data$MINIMUM_PAYMENTS)] <- median(data$MINIMUM_PAYMENTS, na.rm = TRUE)
+```
+
+```{r}
+summary(data)
+```
+```{r}
+sum(is.na(data))
+```
+Dari hasil Summary diatas didapatkan missing value telah hilang
+
+## Mengambil subset data tanpa kolom CUST_ID
+```{r}
+data <- subset(data, select = -CUST_ID)
+
+```
+```{r}
+summary(data)
+```
+
+
+# Langkah 3: Menentukan k Optimum
+
+```{r}
+library(factoextra)
+```
+## Elbow method
+```{r}
+fviz_nbclust(data, kmeans, method = "wss")
+```
+Penentuan nilai optimum dari metode elbow didapatkan dengan melihat grafik yang pertama melandai dimana pada gambar tersebut didapatkan 6 merupakan nilai optimum
+
+## Silhouette method
+```{r}
+fviz_nbclust(data, kmeans, method = "silhouette")
+```
+Silhouette didapatkan dengan melihat titik maksimum dimana pada gambar tersebut didapatkan 2 merupakan nilai optimum. Selain itu juga terdapat opsi dengan memilih titik tertinggi berikutnya. Sehingga dengan mempertimbangkan hasil metode Elbow ditentukan nilai optimumnya 6
+
+# Langkah 4: Melakukan Analisis Cluster
+
+## Clustering dengan nilai K=6
+```{r}
+set.seed(1)
+kmeans_1 <- kmeans(data, 6)
+```
+
+```{r}
+databind_1 <- cbind(data, Cluster = kmeans_1$cluster)
+head(databind_1)
+```
+
+## Menampilkan nilai center dari setiap cluster dan kolom
+```{r}
+options(scipen = 9)
+centers_1 <- data.frame(kmeans_1$centers)
+centers_1$CLUSTER <- 1:nrow(centers_1)
+centers_1s <- data.frame(t(centers_1[-18]))
+colnames(centers_1s) <- centers_1[,18]
+centers_1s
+```
+## Visualisasi Hasil Cluster
+```{r}
+g1 <- fviz_cluster(kmeans_1, geom = c("point", "text"), data = data) +
+  ggtitle("k = 6") + theme_light()
+plot(g1)
+```
+## Melihat nilai Mean, Median, dan Standar Deviasi dari setiap cluster
+```{r}
+library(dplyr)
+data %>%
+ group_by(kmeans_1$cluster) %>%
+ summarise_all(funs(mean = mean, median = median, sd = sd)) %>%
+ as.data.frame()
+```
+
+## Clustering dengan nilai K=5
+```{r}
+kmeans_2 <- kmeans(data,5)
+databind_2 <- cbind(data, Cluster = kmeans_2$cluster)
+head(databind_2)
+```
+
+```{r}
+centers_2 <- data.frame(kmeans_2$centers)
+centers_2$CLUSTER <- 1:nrow(centers_2)
+centers_2s <- data.frame(t(centers_2[-18]))
+colnames(centers_2s) <- centers_2[,18]
+centers_2s
+
+```
+
+```{r}
+g2 <- fviz_cluster(kmeans_2, geom=c("point","text"), data=data) + 
+  ggtitle("k = 5") + theme_light()
+plot(g2)
+
+```
+
+```{r}
+data %>%
+ group_by(kmeans_2$cluster) %>%
+ summarise_all(funs(mean = mean, median = median, sd = sd)) %>%
+ as.data.frame()
+```
+
